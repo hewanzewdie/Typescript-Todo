@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import Task from "./Task";
-import { getAuth } from "firebase/auth";
+import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { getFirestore, collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from "firebase/firestore";
 
 type TaskType = {
-  id: number;
+  id: string; 
   title: string;
   completed: boolean;
 };
@@ -14,11 +14,19 @@ export default function Home({ setIsAuthenticated }: { setIsAuthenticated: (val:
   const [input, setInput] = useState("");
   const [tasks, setTasks] = useState<TaskType[]>([]);
   const [error, setError] = useState("");
-  const [editId, setEditId] = useState<number|null>(null);
+  const [editId, setEditId] = useState<string|null>(null);
   const [editValue, setEditValue] = useState("");
   const navigate = useNavigate();
   const db = getFirestore();
-  const user = getAuth().currentUser;
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -26,7 +34,12 @@ export default function Home({ setIsAuthenticated }: { setIsAuthenticated: (val:
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const loadedTasks: TaskType[] = [];
       querySnapshot.forEach((docSnap) => {
-        loadedTasks.push({ id: docSnap.data().id, title: docSnap.data().title, completed: docSnap.data().completed });
+        const data = docSnap.data();
+        loadedTasks.push({
+          id: docSnap.id, 
+          title: data.title,
+          completed: data.completed,
+        });
       });
       setTasks(loadedTasks);
     });
@@ -41,49 +54,45 @@ export default function Home({ setIsAuthenticated }: { setIsAuthenticated: (val:
     }
     if (!user) return;
     setInput("");
-    const newTask: TaskType = {
-      id: Date.now(),
+    await addDoc(collection(db, "tasks"), {
       title,
       completed: false,
-    };
-    await addDoc(collection(db, "tasks"), { ...newTask, uid: user.uid });
-  };
-
-  const handleCheck = async (id: number) => {
-    if (!user) return;
-    const q = query(collection(db, "tasks"), where("uid", "==", user.uid), where("id", "==", id));
-    const querySnapshot = await getDocs(q);
-    querySnapshot.forEach(async (docSnap) => {
-      await updateDoc(doc(db, "tasks", docSnap.id), { completed: !docSnap.data().completed });
+      uid: user.uid,
     });
   };
 
-  const handleUpdate = (id: number) => {
+  const handleCheck = async (id: string) => {
+    if (!user) return;
+    const taskRef = doc(db, "tasks", id);
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    await updateDoc(taskRef, { completed: !task.completed });
+  };
+
+  const handleUpdate = (id: string) => {
     setEditId(id);
     const task = tasks.find(t => t.id === id);
     setEditValue(task ? task.title : "");
   };
 
   const handleEditSave = async () => {
-    if (editId !== null && editValue.trim() && user) {
-      const q = query(collection(db, "tasks"), where("uid", "==", user.uid), where("id", "==", editId));
-      const querySnapshot = await getDocs(q);
-      querySnapshot.forEach(async (docSnap) => {
-        await updateDoc(doc(db, "tasks", docSnap.id), { title: editValue });
-      });
+    if (!editValue.trim()) {
+      setError("Task name can't be empty.");
+      return;
+    }
+    if (editId !== null && user) {
+      const taskRef = doc(db, "tasks", editId);
+      await updateDoc(taskRef, { title: editValue.trim() });
       setEditId(null);
       setEditValue("");
+      setError("");
     }
-    setError("Task name can't be empty.")
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (!user) return;
-    const q = query(collection(db, "tasks"), where("uid", "==", user.uid), where("id", "==", id));
-    const querySnapshot = await getDocs(q);
-    querySnapshot.forEach(async (docSnap) => {
-      await deleteDoc(doc(db, "tasks", docSnap.id));
-    });
+    const taskRef = doc(db, "tasks", id);
+    await deleteDoc(taskRef);
   };
 
   const handleLogout = async () => {
@@ -117,7 +126,7 @@ export default function Home({ setIsAuthenticated }: { setIsAuthenticated: (val:
           <div key={task.id}>
             <Task task={task} onCheck={handleCheck} onUpdate={handleUpdate} onDelete={handleDelete} />
             {editId === task.id && (
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-2 my-2">
                 <input
                   type="text"
                   value={editValue}

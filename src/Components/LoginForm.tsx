@@ -33,12 +33,16 @@ export default function LoginForm({ setIsAuthenticated }: { setIsAuthenticated: 
       <h2 className="text-2xl font-bold text-center">Login</h2>
       <input type="email" placeholder="Email" className="w-full p-2 border rounded" value={email} onChange={(e) => setEmail(e.target.value)} required />
       <input type="password" placeholder="Password" className="w-full p-2 border rounded" value={password} onChange={(e) => setPassword(e.target.value)} required />
-      <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600" disabled={authing}>
-        Login
+      <button
+        type="submit"
+        className={`w-full text-white p-2 rounded ${authing ? 'bg-blue-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 cursor-pointer'}`}
+        disabled={authing}
+      >
+        {authing ? "Loading..." : "Login"}
       </button>
       {error && <div className="text-red-500">{error}</div>}
       <p className="text-center text-sm">
-        Don’t have an account?{" "}
+        Don't have an account?{" "}
         <Link to="/register" className="text-blue-600 underline">
           Register
         </Link>

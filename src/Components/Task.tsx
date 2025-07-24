@@ -1,12 +1,12 @@
 export type TaskProps = {
   task: {
-    id: number;
+    id: string; 
     title: string;
     completed: boolean;
   };
-  onCheck: (id: number) => void;
-  onUpdate: (id: number) => void;
-  onDelete: (id: number) => void;
+  onCheck: (id: string) => void;
+  onUpdate: (id: string) => void;
+  onDelete: (id: string) => void;
 };
 
 export default function Task({ task, onCheck, onUpdate, onDelete }: TaskProps) {
